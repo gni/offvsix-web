@@ -32,7 +32,6 @@ jobs:
       - name: Build and export Next.js
         run: |
           npm run build
-          npm run export
 
       - name: Upload static site artifact
         uses: actions/upload-artifact@v4
