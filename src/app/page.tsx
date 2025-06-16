@@ -1,103 +1,232 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+import React, { useState, useTransition, useEffect, useCallback } from "react"
+import { useForm, SubmitHandler } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+import { ExtensionSearchResult, InitialData, ApiSearchResponseSchema } from "@/lib/types"
+import { useQueue } from "@/context/queue-context"
+
+import { Icons } from "@/components/icons"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { PageLoader, SkeletonRow } from "@/components/ui/loader"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ExtensionCard } from "@/components/ExtensionCard"
+import { processMarketplaceExtensions, API_QUERY_FLAGS } from "@/lib/marketplace-utils"
+
+const MARKETPLACE_API_URL = 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery';
+const API_VERSION = "7.2-preview.1";
+const USER_AGENT = "VSIX-Downloader-Web/1.0";
+
+const SearchFormSchema = z.object({
+  searchTerm: z.string().min(2, { message: "Search term must be at least 2 characters." }),
+})
+type SearchFormValues = z.infer<typeof SearchFormSchema>
+
+const MasonryGrid = ({ children }: { children: React.ReactNode }) => (
+  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    {children}
+  </div>
+);
+
+function HomePageContent() {
+  const [isSearching, startSearchTransition] = useTransition()
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [initialData, setInitialData] = useState<Partial<InitialData>>({});
+  const [searchResults, setSearchResults] = useState<ExtensionSearchResult[] | null>(null)
+
+  const { isQueued, toggleQueue } = useQueue();
+
+  const searchForm = useForm<SearchFormValues>({ resolver: zodResolver(SearchFormSchema) })
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadCategory(
+      category: keyof InitialData,
+      sortBy: number
+    ) {
+      const payload = {
+        filters: [
+          {
+            criteria: [{ filterType: 8, value: "Microsoft.VisualStudio.Code" }],
+            pageSize: 12,
+            pageNumber: 1,
+            sortBy,
+          },
+        ],
+        flags: API_QUERY_FLAGS,
+      };
+
+      try {
+        const response = await fetch(MARKETPLACE_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: `application/json;api-version=${API_VERSION}`,
+            "User-Agent": USER_AGENT,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Marketplace API request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const extensions = processMarketplaceExtensions(
+          data?.results?.[0]?.extensions || []
+        );
+
+        if (!isCancelled) {
+          setInitialData(prev => ({ ...prev, [category]: extensions }));
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setError(prev => prev ?? `Failed to load ${category}: ${err instanceof Error ? err.message : "Unknown error"}`);
+        }
+      }
+    }
+
+    setIsInitialLoading(true);
+    setError(null);
+
+    loadCategory("popular", 4);
+    loadCategory("featured", 12);
+    loadCategory("recent", 10);
+
+    const timeout = setTimeout(() => {
+      if (!isCancelled) setIsInitialLoading(false);
+    }, 200);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timeout);
+    };
+  }, []);
+
+
+  const handleSearch: SubmitHandler<SearchFormValues> = ({ searchTerm }) => {
+    startSearchTransition(async () => {
+      setSearchResults(null);
+      setError(null);
+      try {
+        const payload = {
+          filters: [
+            {
+              criteria: [
+                { filterType: 10, value: searchTerm },
+                { filterType: 8, value: "Microsoft.VisualStudio.Code" },
+              ],
+              pageSize: 50,
+              pageNumber: 1,
+              sortBy: 4,
+              sortOrder: 0,
+            },
+          ],
+          flags: API_QUERY_FLAGS,
+        };
+
+        const response = await fetch(MARKETPLACE_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: `application/json;api-version=${API_VERSION}`,
+            "User-Agent": USER_AGENT,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Marketplace API search failed: ${response.status} ${errorText}`);
+        }
+
+        const data = await response.json();
+        const extensions = data?.results?.[0]?.extensions || [];
+        const enrichedResults = processMarketplaceExtensions(extensions);
+        const validatedResults = ApiSearchResponseSchema.parse(enrichedResults);
+
+        setSearchResults(validatedResults);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "An unknown error occurred during search.");
+      }
+    });
+  };
+
+  const clearSearch = useCallback(() => {
+    setSearchResults(null);
+    searchForm.reset();
+  }, [searchForm]);
+
+  const renderContent = () => {
+    if (error) return <Alert variant="destructive"><Icons.warning className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>
+
+    if (searchResults !== null) {
+      return (
+        <section>
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Search Results</h2>
+            <Button variant="ghost" onClick={clearSearch}><Icons.close className="h-4 w-4 mr-2" />Clear</Button>
+          </div>
+          <MasonryGrid>
+            {isSearching ? [...Array(12)].map((_, i) => <SkeletonRow key={i} />) :
+              (searchResults.length > 0 ? searchResults.map(ext => <ExtensionCard key={ext.id} ext={ext} onQueueToggle={toggleQueue} isQueued={isQueued(ext.id)} />) : <p className="col-span-full p-8 text-center text-muted-foreground">No extensions found for your search.</p>)
+            }
+          </MasonryGrid>
+        </section>
+      )
+    }
+
+    if (initialData) {
+      return (
+        <div className="space-y-12">
+          {Object.entries(initialData).map(([category, extensions]) => (
+            <section key={category}>
+              <h2 className="inline-block text-2xl font-bold tracking-tight text-foreground capitalize mb-6 sm:text-3xl">{category}</h2>
+              <MasonryGrid>
+                {(extensions as ExtensionSearchResult[]).map(ext => <ExtensionCard key={ext.id} ext={ext} onQueueToggle={toggleQueue} isQueued={isQueued(ext.id)} />)}
+              </MasonryGrid>
+            </section>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+      )
+    }
+
+    return null;
+  }
+
+  if (isInitialLoading) {
+    return <PageLoader text="Loading extensions..." />
+  }
+
+  return (
+    <main className="container relative mx-auto px-4 py-12 sm:px-6 lg:py-16 lg:px-8">
+      <div className="mx-auto max-w-2xl text-center mb-12 sm:mb-16">
+        <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl">offvsix web</h1>
+        <p className="mt-6 text-lg leading-8 text-muted-foreground">Your portal for offline VS Code extensions. Search, queue, and download <code>.vsix</code> files for any environment.</p>
+        <form
+          onSubmit={searchForm.handleSubmit(handleSearch)}
+          className="mt-8 flex w-full max-w-lg mx-auto items-center gap-2"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+          <div className="relative flex-grow">
+            <Icons.search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              {...searchForm.register("searchTerm")}
+              placeholder="Search by name or publisher..."
+              disabled={isSearching}
+              className="h-12 text-base pl-12 w-full"
+            />
+          </div>
+        </form>
+
+      </div>
+      {renderContent()}
+    </main>
+  )
 }
+
+export default HomePageContent;
