@@ -103,6 +103,11 @@ npm install
 npm run dev
 ```
 
+## Install downloaded extension
+```bash
+code --install-extension ./extensions/ms-python.python-2023.17.12561009.vsix
+```
+
 ---
 
 ## Python cli
