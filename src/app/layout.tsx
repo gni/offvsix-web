@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Icons } from '@/components/icons';
 import { QueueProvider } from '@/context/queue-context';
 import { HeaderActions } from '@/components/header-actions';
+import getConfig from 'next/config'
 
 export const metadata: Metadata = {
   title: "offvsix web - Offline VSIX Downloader",
@@ -31,6 +32,9 @@ export const metadata: Metadata = {
   },
 };
 
+const { publicRuntimeConfig } = getConfig()
+const basePath = publicRuntimeConfig?.basePath || '/offvsix-web'
+
 export const viewport: Viewport = {
   colorScheme: "dark light",
   themeColor: [
@@ -53,7 +57,7 @@ export default function RootLayout({
               {/* Header */}
               <header className="w-full bg-background">
                 <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-                  <a href="/" className="flex items-center gap-2 font-semibold">
+                  <a href={`${basePath}/`} className="flex items-center gap-2 font-semibold">
                     <Icons.package className="h-6 w-6" />
                     <span className="text-lg">offvsix</span>
                   </a>

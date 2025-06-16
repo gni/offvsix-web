@@ -4,6 +4,10 @@ const nextConfig = {
   poweredByHeader: false,
   output: 'export',
   basePath: '/offvsix-web',
+  assetPrefix: '/offvsix-web/',
+  publicRuntimeConfig: {
+    basePath: '/offvsix-web',
+  },
   images: {
     unoptimized: true,
     remotePatterns: [
