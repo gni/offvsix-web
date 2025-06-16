@@ -1,13 +1,19 @@
 {
   "name": "offvsix-web",
   "version": "0.1.0",
-  "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
+  "homepage": "https://gni.github.io/offvsix-web",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gni.github.io/offvsix-web.git"
+  },
+  "author": "Lucian BLETAN",
+  "license": "MIT",
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-slot": "^1.2.3",

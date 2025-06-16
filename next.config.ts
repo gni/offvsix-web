@@ -3,6 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: 'export',
+  basePath: '/offvsix-web',
   images: {
     unoptimized: true,
     remotePatterns: [
