@@ -66,7 +66,6 @@ Or configure your GitHub Actions/Pages settings to serve `/offvsix-web/`.
 
   * Popular
   * Featured (Trending)
-  * Recent
 * ➕ Add to queue (animated UI)
 * 📁 Download queue as `.vsix` or bundled `.zip`
 * 🛡 Verified publisher badge

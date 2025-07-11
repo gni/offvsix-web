@@ -49,5 +49,5 @@ export type ApiErrorResponse = z.infer<typeof ApiResponseErrorSchema>
 export type InitialData = {
     featured: ExtensionSearchResult[],
     popular: ExtensionSearchResult[],
-    recent: ExtensionSearchResult[]
+    // recent: ExtensionSearchResult[]
 }

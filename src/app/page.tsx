@@ -96,7 +96,7 @@ function HomePageContent() {
 
     loadCategory("popular", 4);
     loadCategory("featured", 12);
-    loadCategory("recent", 10);
+    // loadCategory("recent", 10);
 
     const timeout = setTimeout(() => {
       if (!isCancelled) setIsInitialLoading(false);
